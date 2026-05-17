@@ -10,7 +10,7 @@ services:
     ports:
       - ${SRC_POSTGRES_PORT}:5432
     volumes:
-      - ./source_data:/docker-entrypoint-initdb.d
+      - ./database/source_data:/docker-entrypoint-initdb.d
       - source-volume:/var/lib/postgresql/data
     networks:
       - mentoring-networks
@@ -26,7 +26,7 @@ services:
     ports:
       - ${STG_POSTGRES_PORT}:5432
     volumes:
-      - ./staging_data:/docker-entrypoint-initdb.d
+      - ./database/staging_data:/docker-entrypoint-initdb.d
       - staging-volume:/var/lib/postgresql/data
     networks:
       - mentoring-networks
@@ -36,13 +36,13 @@ services:
     container_name: warehouse_db
     restart: always
     environment:
-      - POSTGRES_DB=${WH_POSTGRES_DB}
-      - POSTGRES_USER=${WH_POSTGRES_USER}
-      - POSTGRES_PASSWORD=${WH_POSTGRES_PASSWORD}
+      - POSTGRES_DB=${DWH_POSTGRES_DB}
+      - POSTGRES_USER=${DWH_POSTGRES_USER}
+      - POSTGRES_PASSWORD=${DWH_POSTGRES_PASSWORD}
     ports:
-      - ${WH_POSTGRES_PORT}:5432
+      - ${DWH_POSTGRES_PORT}:5432
     volumes:
-      - ./warehouse_data:/docker-entrypoint-initdb.d
+      - ./database/warehouse_data:/docker-entrypoint-initdb.d
       - warehouse-volume:/var/lib/postgresql/data
     networks:
       - mentoring-networks
@@ -58,33 +58,39 @@ services:
     ports:
       - ${LOG_POSTGRES_PORT}:5432
     volumes:
-      - ./log_data:/docker-entrypoint-initdb.d
+      - ./database/log_data:/docker-entrypoint-initdb.d
       - log-volume:/var/lib/postgresql/data
     networks:
       - mentoring-networks
 
   minio:
-    image: minio/minio:latest
-    container_name: minio-container
+    image: quay.io/minio/minio:RELEASE.2025-03-12T18-04-18Z
+    container_name: minio
+    hostname: minio
     restart: always
-    environment:
-      MINIO_ROOT_USER: "${MINIO_ACCESS_KEY}"
-      MINIO_ROOT_PASSWORD: "${MINIO_SECRET_KEY}"
-    command: server --address ":9000" --console-address ":9090" /data
-    ports:
-      - "9000:9000" # API port
-      - "9090:9090" # Console port
-    volumes:
-      - minio_volume:/data
     networks:
       - mentoring-networks
+    volumes:
+      - minio-volume:/data
+    ports:
+      - 9000:9000
+      - 9001:9001
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
 
 volumes:
   source-volume:
   staging-volume:
   warehouse-volume:
   log-volume:
-  minio_volume:
+  minio-volume:
 
 networks:
   mentoring-networks:
