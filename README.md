@@ -58,8 +58,8 @@ MinIO (S3-compatible object storage) is used as a fallback for failed records.
 ## Pipeline Workflow
 
 1. **Setting up** : Set up logger, load .env, validate DB and MinIO connections
-2. **Extract — PostgreSQL** : Read all tables from source schema in PostgreSQL
-3. **Extract — Google Sheets** : Fetch store data via Sheets API
+2. **Extract from PostgreSQL** : Read all tables from source schema in PostgreSQL
+3. **Extract from Google Sheets** : Fetch store data via Sheets API
 4. **Load to Staging** : Insert/upsert all extracted records into staging schema
 5. **Transform** : Transform based on business requirements such as handling null values
 6. **Load to Warehouse** : Insert transformed data into warehouse database
