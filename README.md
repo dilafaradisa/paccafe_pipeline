@@ -51,7 +51,7 @@ MinIO (S3-compatible object storage) is used as a fallback for failed records.
 | Containerization | Docker Compose | Used to run PostgreSQL, MinIO, and source database services in containers |
 | Pipeline Language | Python | Used to build the core logic for extracting, transforming, and loading data |
 | Spreadsheet Connector | gspread + google-auth | Fetch data from Google Sheets via Service Account |
-| Object Storage | MinIO | Stores failed records as JSON files for easier recovery |
+| Object Storage | MinIO | Stores failed records for easier recovery |
 
 ---
 
