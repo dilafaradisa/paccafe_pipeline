@@ -1,43 +1,23 @@
 ﻿# PacCafe Data Integration & ETL Pipeline
 
-A centralized and automated ETL data pipeline for PacCafe cafe business that collects data from multiple sources, standardizes and transforms it, and loads it into a structured data warehouse for analysis and business intelligence.
-
----
-
 ## Requirement Gathering
 
 ### Business Background
 
-PacCafe is a growing cafe business with multiple store branches. The management team wants to perform data-driven analysis and build a dashboard to monitor business performance. However, data is scattered across multiple sources in different formats and systems, making it difficult and time-consuming for the owner to access and analyze data manually.
-
-### Stakeholders
-
-| Stakeholder | Role | Interest |
-|---|---|---|
-| PacCafe Owner / Manager | Business Decision Maker | Access unified dashboard for business analysis |
-| Data Engineer | Pipeline Developer | Build and maintain the ETL pipeline |
-| Data Analyst | Report Consumer | Use warehouse data for analysis and visualization |
+PacCafe is a growing cafe business with multiple store branches. The management team wants to perform analysis based on data and build a dashboard to monitor business performance. However, the data is scattered across multiple sources in different formats and systems, making it difficult and time consuming for the owner to access and analyze the data manually.
 
 ### Problem Statement
 
-| # | Problem | Impact |
+|  | Problem | Impact |
 |---|---|---|
 | 1 | Data scattered across multiple sources (PostgreSQL, Google Sheets) with no central repository | Owner must manually merge data from multiple tools to get complete analysis |
 | 2 | No automated data pipeline; all consolidation done manually | High risk of human error, slow reporting cycle, wasted analyst time |
 | 3 | Raw data contains inconsistencies, nulls, and duplicate records | Unreliable reports and incorrect business decisions |
 | 5 | No logging and backup process for pipeline failures | Missing data in reports and difficult troubleshooting |
 
----
+### Proposed Solutions
 
-## Proposed Solutions
-
-### Solution Overview
-
-Build a centralized and automated ETL data pipeline that collects data from all source systems, standardizes and transforms it, and loads it into a structured data warehouse that is ready for analysis and dashboard reporting.
-
-### Solution Mapping
-
-| # | Problem | Solution |
+|  | Problem | Solution |
 |---|---|---|
 | 1 | Scattered data across sources | Build centralized staging layer in PostgreSQL to combine data from all sources into single schema |
 | 2 | No automated pipeline | Develop ETL scripts for staging and warehouse layers |
@@ -50,24 +30,17 @@ Build a centralized and automated ETL data pipeline that collects data from all 
 
 ### Source Systems
 
-| Source | Type | Tables / Entities | Access Method |
-|---|---|---|---|
-| PostgreSQL (Docker) | Relational DB | sales, employees, members, inventory | psycopg2 via Docker network |
-| Google Sheets | Spreadsheet | store_branch_paccofee | Google Sheets API + gspread |
+- **PostgreSQL** : customers, employees, products, inventory_tracking, orders, order_details
+- **Google Sheets** : store_branch
 
 ### Sink
 
-All processed data is loaded into a PostgreSQL database with two dedicated schemas:
-
-- **staging** — Raw data from all sources, lightly cleaned, timestamped
-- **warehouse** — Fully transformed, business-ready fact and dimension tables
+- **staging** : Raw data from all source systems is loaded into the staging database without any modifications.
+- **warehouse** : Data from the staging layer is then transformed based on business requirements.
 
 ### Error Storage
 
-MinIO (S3-compatible object storage) is used as a fallback for failed records. Failed JSON payloads are stored under:
-```
-errors/{layer}/{table}_{timestamp}.json
-```
+MinIO (S3-compatible object storage) is used as a fallback for failed records.
 
 ---
 
@@ -75,284 +48,25 @@ errors/{layer}/{table}_{timestamp}.json
 
 | Category | Tool | Purpose |
 |---|---|---|
-| Containerization | Docker Compose | Spin up PostgreSQL, MinIO, and source DB containers |
-| Pipeline Language | Python 3.11+ | Core scripting for Extract, Transform, Load logic |
-| Source DB Connector | psycopg2 | Connect to PostgreSQL source and sink |
+| Containerization | Docker Compose | Used to run PostgreSQL, MinIO, and source database services in containers |
+| Pipeline Language | Python | Used to build the core logic for extracting, transforming, and loading data |
 | Spreadsheet Connector | gspread + google-auth | Fetch data from Google Sheets via Service Account |
-| Object Storage | MinIO | Store failed payload dumps for error recovery |
-| Logging | Python logging module | Structured logs to file and console |
-| Environment Config | python-dotenv | Manage credentials and connection strings via .env |
+| Object Storage | MinIO | Stores failed records as JSON files for easier recovery |
 
 ---
 
-## Pipeline Architecture
+## Pipeline Workflow
 
-### Three-Layer Architecture
-
-| Layer | Schema | Script | Responsibility |
-|---|---|---|---|
-| **Source** | (External) | — | PostgreSQL Docker + Google Sheets as-is |
-| **Staging** | staging | staging/extract_load.py | Extract raw data, minimal type casting, load with timestamp |
-| **Warehouse** | warehouse | warehouse/transform_load.py | Join, clean, aggregate, build facts & dimensions |
-
-### Pipeline Workflow
-
-The pipeline runs in the following order when `main.py` is executed:
-
-1. **Initialize** — Set up logger, load .env, validate DB and MinIO connections
-2. **Extract — PostgreSQL** — Read all tables from source schema in Docker PostgreSQL
-3. **Extract — Google Sheets** — Fetch store_branch_paccofee via Sheets API
-4. **Load → Staging** — Insert/upsert all extracted records into staging schema
-5. **Transform** — Apply business logic: clean nulls, cast types, join tables
-6. **Load → Warehouse** — Insert transformed data into warehouse database
-7. **Error Handling** — On failure: log error, dump failed records to MinIO, continue remaining steps
-8. **Log Summary** — Write final run summary to log file
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Docker & Docker Compose
-- Python 3.11+
-- Git
-- Google Service Account credentials (for Google Sheets API)
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Kurikulum-Sekolah-Pacmann/data_pipeline_paccafe.git
-   cd data_pipeline_paccafe
-   ```
-
-2. **Set up Python virtual environment**
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
-
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Set up environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your database credentials and Google API keys
-   ```
-
-5. **Start Docker containers**
-   ```bash
-   docker-compose up -d
-   ```
-
----
-
-## Project Structure
-
-```
-data_pipeline_paccafe/
-├── main.py                           # Entry point for pipeline
-├── README.md                         # This file
-├── requirements.txt                  # Python dependencies
-├── .env                              # Environment variables (not in git)
-├── .env.example                      # Environment variables template
-├── docker-compose.yaml               # Docker services configuration
-├── credentials/
-│   └── de-zoomcamp-461407-c8279793af87.json  # Google Service Account
-├── database/
-│   ├── log_data/
-│   │   └── init.sql                  # Log database schema
-│   ├── source_data/
-│   │   └── init.sql                  # Source database schema
-│   ├── staging_data/
-│   │   └── init.sql                  # Staging database schema
-│   └── warehouse_data/
-│       └── init.sql                  # Warehouse database schema
-├── model/
-│   └── log.sql                       # Log table definition
-├── logs/
-│   └── pipeline.log                  # Pipeline execution logs
-└── src/
-    ├── __init__.py
-    ├── integration/
-    │   ├── staging/
-    │   │   ├── extract.py            # Extract from sources
-    │   │   ├── load.py               # Load to staging
-    │   │   └── staging_pipeline.py   # Staging pipeline orchestration
-    │   └── warehouse/
-    │       ├── extract.py            # Extract from staging
-    │       ├── load.py               # Load to warehouse
-    │       ├── transform.py          # Data transformation logic
-    │       └── warehouse_pipeline.py # Warehouse pipeline orchestration
-    └── utils/
-        ├── __init__.py
-        └── helper.py                 # Utility functions
-```
-
----
-
-## Configuration
-
-### Environment Variables (.env)
-
-```env
-# PostgreSQL Source Database
-SRC_POSTGRES_HOST=source_postgres
-SRC_POSTGRES_PORT=5432
-SRC_POSTGRES_USER=sourceuser
-SRC_POSTGRES_PASSWORD=sourcepassword
-SRC_POSTGRES_DB=source_db
-
-# PostgreSQL Staging Database
-STG_POSTGRES_HOST=staging_postgres
-STG_POSTGRES_PORT=5432
-STG_POSTGRES_USER=staginguser
-STG_POSTGRES_PASSWORD=stagingpassword
-STG_POSTGRES_DB=staging_db
-
-# PostgreSQL Warehouse Database
-WH_POSTGRES_HOST=warehouse_postgres
-WH_POSTGRES_PORT=5432
-WH_POSTGRES_USER=warehouseuser
-WH_POSTGRES_PASSWORD=warehousepassword
-WH_POSTGRES_DB=warehouse_db
-
-# MinIO Configuration
-MINIO_HOST=minio
-MINIO_PORT=9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
-MINIO_BUCKET=paccafe-errors
-
-# Google Sheets API
-GOOGLE_SHEETS_CREDENTIALS_PATH=./credentials/de-zoomcamp-461407-c8279793af87.json
-GOOGLE_SHEETS_ID=<your-sheet-id>
-
-# Logging
-LOG_LEVEL=INFO
-LOG_FILE=./logs/pipeline.log
-```
-
----
-
-## Running the Pipeline
-
-### Execute Full Pipeline
-
-```bash
-python main.py
-```
-
-This will:
-- Extract data from PostgreSQL and Google Sheets
-- Load raw data to staging schema
-- Transform data according to business rules
-- Load processed data to warehouse schema
-- Log all operations and errors
-
-### View Logs
-
-```bash
-tail -f logs/pipeline.log
-```
-
-### Check Failed Records in MinIO
-
-Failed records are automatically stored in MinIO under the `errors/` prefix:
-```
-errors/staging/sales_2025-06-01_14-30-45.json
-errors/warehouse/members_2025-06-01_14-35-12.json
-```
-
----
-
-## Logging & Error Handling
-
-### Error Handling Flow
-
-Each Extract and Load function is wrapped in a try/except block. On exception:
-
-1. **Log the error** with full traceback to the log file
-2. **Serialize failed data** as a JSON object
-3. **Upload to MinIO** under `errors/{layer}/{table}_{timestamp}.json`
-4. **Continue execution** — one failure does not stop the entire run
-
-### Log Entries
-
-Each pipeline step produces structured log entries with:
-- Step name and start time
-- Row count (if applicable)
-- Status (SUCCESS / FAILED)
-- End time and duration
-
-Example:
-```
-2025-06-01 14:30:45 | INFO | [STAGING] Extracting PostgreSQL tables... | START
-2025-06-01 14:30:47 | INFO | [STAGING] Table: sales | Rows: 1234 | SUCCESS
-2025-06-01 14:30:48 | INFO | [STAGING] Extract completed | TOTAL: 3542 rows | SUCCESS
-```
-
----
-
-## Acceptance Criteria
-
-The pipeline is considered complete and accepted when:
-
-✅ All source tables from PostgreSQL are successfully extracted and loaded to staging schema
-
-✅ Google Sheets store branch data is fetched and stored in staging schema
-
-✅ All staging data is transformed and loaded into warehouse schema
-
-✅ Pipeline can be triggered end-to-end by running `python main.py`
-
-✅ All pipeline steps produce structured log entries (start, row count, status, end)
-
-✅ Any failed batch is automatically dumped to MinIO — no silent failures
-
-✅ All credentials stored in .env and never hardcoded in scripts
-
-✅ Code pushed to GitHub repository with clear README
-
----
-
-## Support & Troubleshooting
-
-### Common Issues
-
-**Q: Pipeline fails to connect to PostgreSQL**
-- Ensure Docker containers are running: `docker-compose ps`
-- Check database credentials in `.env`
-- Verify network connectivity between containers
-
-**Q: Google Sheets API errors**
-- Verify Service Account credentials file exists and is valid
-- Check Google Sheets ID in `.env`
-- Ensure API is enabled in Google Cloud Console
-
-**Q: MinIO connection fails**
-- Verify MinIO container is running: `docker-compose ps`
-- Check MinIO credentials in `.env`
-- Test connection: `mc alias set paccafe <MINIO_HOST> <ACCESS_KEY> <SECRET_KEY>`
-
-### Debug Mode
-
-Enable debug logging by setting in `.env`:
-```env
-LOG_LEVEL=DEBUG
-```
+1. **Setting up** : Set up logger, load .env, validate DB and MinIO connections
+2. **Extract — PostgreSQL** : Read all tables from source schema in PostgreSQL
+3. **Extract — Google Sheets** : Fetch store data via Sheets API
+4. **Load to Staging** : Insert/upsert all extracted records into staging schema
+5. **Transform** : Transform based on business requirements such as handling null values
+6. **Load to Warehouse** : Insert transformed data into warehouse database
+7. **Error Handling** : If a failue occurs, log the error and store failed records in MinIO
 
 ---
 
 ## Contact & Questions
 
-For questions or issues, contact the data engineering team.
-
----
-
-**Last Updated:** June 2025  
-**Version:** 1.0
+For any further question, feel free to reach out to me at [Linkedin](https://www.linkedin.com/in/adila-zahra-faradisa/)
